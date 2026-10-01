@@ -1,6 +1,6 @@
 # ShieldDeck for macOS
 
-Здесь находится первый CLI bridge: Serial → Cmd+Tab → ACK/RESULT. Native helper на Swift отправляет keyboard events через CoreGraphics; Python bridge обслуживает Serial, heartbeat и reconnect независимо от helper. Menu bar UI пока отсутствует.
+Здесь находится CLI bridge: Serial → действие Mac → ACK/RESULT. Native helper на Swift отправляет keyboard events через CoreGraphics; Python bridge обслуживает Serial, heartbeat и reconnect независимо от действия. Menu bar UI пока отсутствует.
 
 ## Сборка и запуск
 
@@ -15,7 +15,17 @@ companion/.build/ShieldDeckKeys --check
 
 Перед запуском закрыть Serial Monitor/capture; портом владеет только bridge. Firmware должна быть собрана и загружена через `pio run -e uno -t upload`. Для возврата к hardware tests используется `-e smoke`.
 
-S1 выполняет Cmd+Tab на отпускании. S2/S3 ещё не назначены: возвращают ERR 3, без запуска приложений. LED4 постоянно горит при handshake/config/heartbeat; без bridge мигает, display `----`. Ready display `P001`, нажатие `b001`, после успешной отправки клавиш — кратко `0001` и LED1 на 150 ms. Затем LED1 гаснет, display возвращается к profile. Sound по умолчанию выключен. Это stateless feedback; OK означает отправку events, а видимое переключение app подтверждается пользователем.
+Назначения выполняются на отпускании кнопки:
+
+| Кнопка | Действие | Что подтверждает OK |
+| --- | --- | --- |
+| S1 | Cmd+Tab | Keyboard events отправлены |
+| S2 | Открыть/активировать Калькулятор | Launch Services принял запрос для `com.apple.calculator` |
+| S3 | Cmd+Shift+4 | Отправлен shortcut выбора области screenshot; создание файла не подтверждается |
+
+Калькулятор реализует выбранный в архитектуре Open Application preset; глобальный Play/Pause пока не добавлен. S3 можно отменить клавишей Escape, не создавая изображение. Калькулятор не требует Accessibility; S1/S3 требуют.
+
+LED4 постоянно горит при handshake/config/heartbeat; без bridge мигает, display `----`. Ready display `P001`, нажатие `b001`/`b002`/`b003`, успех — кратко `0001`/`0002`/`0003` и соответствующий LED на 150 ms. Затем LED гаснет, display возвращается к profile. Sound по умолчанию выключен. Это stateless feedback; видимый результат подтверждается пользователем.
 
 Bridge запоминает USB serial number выбранного устройства и reconnect делает только к нему, даже при смене port path. Если плата отсутствует при запуске, передать `--serial-number` явно. Ctrl+C закрывает порт; device станет offline через 3 s. Log печатается в stdout; при необходимости перенаправить в файл вне Git. `--no-actions` позволяет проверять transport без клавиш: такой режим всегда возвращает ERR 3, не фиктивный OK.
 
@@ -37,7 +47,7 @@ companion/.build/ShieldDeckKeys --request-permission
 ~/.platformio/penv/bin/python -m unittest discover -s companion -p 'test_*.py' -v
 ```
 
-Unit tests не отправляют клавиши. Покрыты duplicate/in-flight events, denied permissions, wrong session/revision, unassigned buttons, busy, heartbeat, timeout, reset, framing. Реальный тест S1 и визуальный результат Mac выполняются отдельно.
+Unit tests не отправляют клавиши и не открывают приложения. Покрыты duplicate/in-flight events, denied permissions, wrong session/revision, недопустимые номера кнопок, busy, heartbeat, timeout, reset, framing, маршрутизация трёх actions, Launch Services failure и no-actions mode. Физические тесты и визуальный результат Mac выполняются отдельно.
 
 Будущий native app: Swift + SwiftUI Configure, AppKit menu bar. Первоначальная проверка CLI выполняется на текущем Mac; совместимость других macOS ещё не проверена.
 

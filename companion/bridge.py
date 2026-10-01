@@ -1,4 +1,4 @@
-"""Minimal macOS serial bridge: S1 -> native Cmd+Tab helper, protocol v1."""
+"""macOS bridge: S1 Cmd+Tab, S2 Calculator, S3 screenshot selection; protocol v1."""
 import argparse
 from datetime import datetime, timezone
 import fcntl
@@ -22,16 +22,23 @@ class KeyRunner:
         self.disabled = disabled
         self.process = None
         self.simulated = False
+        self.button = None
 
     @property
     def busy(self):
         return self.process is not None or self.simulated
 
-    def start(self):
+    def start(self, button):
+        self.button = button
         if self.disabled:
             self.simulated = True
             return
-        self.process = subprocess.Popen([str(self.executable), "--cmd-tab"],
+        commands = {
+            1: [str(self.executable), "--cmd-tab"],
+            2: ["/usr/bin/open", "-b", "com.apple.calculator"],
+            3: [str(self.executable), "--screenshot"],
+        }
+        self.process = subprocess.Popen(commands[button],
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     def poll(self):
@@ -44,11 +51,17 @@ class KeyRunner:
         stdout, stderr = self.process.communicate()
         code = self.process.returncode
         self.process = None
-        if code == 0 and stdout.strip() == "SENT_CMD_TAB":
-            log("SENT_CMD_TAB: macOS events posted; visible switch requires user confirmation")
+        expected = {1: "SENT_CMD_TAB", 2: "", 3: "SENT_SCREENSHOT_SHORTCUT"}[self.button]
+        if code == 0 and stdout.strip() == expected:
+            messages = {
+                1: "SENT_CMD_TAB: macOS events posted; visible switch requires user confirmation",
+                2: "OPEN_CALCULATOR_REQUESTED: Launch Services accepted; visible app requires user confirmation",
+                3: "SENT_SCREENSHOT_SHORTCUT: selection requested; no claim that an image was saved",
+            }
+            log(messages[self.button])
             return 0
         log(f"ACTION_ERROR: {stderr.strip()[:1000] or 'native helper failed'}")
-        return code if code in (2, 4) else 5
+        return code if self.button != 2 and code in (2, 4) else 5
 
 
 def main():

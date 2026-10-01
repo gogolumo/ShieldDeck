@@ -1,4 +1,4 @@
-"""Protocol v1 subset for the first stateless S1 action; no macOS imports."""
+"""Protocol v1 subset for three stateless actions; no macOS imports."""
 import secrets
 
 
@@ -92,7 +92,7 @@ class Session:
             self.last_pong = now
         elif f == ["CONFIGURED", self.sid, "1"] and self.state == "config":
             self.state = "active"
-            self.log("CONNECTED: P001; S1 = Cmd+Tab; S2/S3 are not assigned")
+            self.log("CONNECTED: P001; S1 = Cmd+Tab; S2 = Calculator; S3 = Screenshot selection")
         elif f[0] == "BTN" and len(f) == 6 and self.state == "active":
             rev, seq, button = number(f[2], 1, 65535), number(f[3], 1, 65535), number(f[4], 1, 3)
             if None in (rev, seq, button) or f[5] != "SHORT":
@@ -110,13 +110,10 @@ class Session:
             if self.runner.busy:
                 self.result(rev, seq, 4)
                 return
-            if button != 1:
-                self.result(rev, seq, 3)
-                return
             self.send(f"ACK|{self.sid}|{rev}|{seq}")
             self.pending = (rev, seq, now, False)
             try:
-                self.runner.start()
+                self.runner.start(button)
             except OSError as error:
                 self.log(f"ACTION_ERROR: {error}")
                 self.result(rev, seq, 3)

@@ -190,3 +190,11 @@ clang++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -Itest/fak
 Во время пользовательских проб до подтверждения зарегистрирован 31 event: 17 S1, 10 S2, 4 S3. Повторных sid/rev/seq нет. Для S1: 16 отправок Cmd+Tab с OK и один ERR 4 (busy); S2/S3 ещё не назначены и получили 14 ERR 3. Пользователь пробовал несколько кнопок, поэтому этот журнал не является контролируемым тестом «31 физических нажатие». Одиночные button smoke tests и отсутствие повторного запуска одного event ID проверены отдельно.
 
 Первый рабочий vertical slice принят по пользовательскому подтверждению. Полный endurance, 100 нажатий и все критерии ShieldDeck v1 ещё не выполнены. Следующий разрешённый этап — назначить S2 безопасное Open Application и S3 screenshot shortcut, с отдельной физической проверкой каждой кнопки.
+
+## Добавлены назначения S2/S3
+
+S2 запускает `/usr/bin/open -b com.apple.calculator`; bundle ID проверен в установленном `/System/Applications/Calculator.app`. S3 отправляет Cmd+Shift+4 через native helper. OK для S3 означает отправку shortcut, а не создание screenshot; пользователь может отменить selection через Escape.
+
+Swift helper пересобран, preflight ACCESSIBILITY_OK. 13 software tests PASS, включая маршрутизацию трёх кнопок и ошибки запуска. В tests процессы замоканы — реальные клавиши/приложения не запускаются. Firmware не изменена: используются прежние generic button events и feedback. Поэтому повторная прошивка не требуется.
+
+Bridge перезапущен с новыми назначениями; log: `/tmp/shielddeck-bridge-three-buttons-2026-10-01.log`. Физические проверки S2/S3 пока ожидаются. Следующее действие пользователя — одно нажатие S2 с подтверждением появления Калькулятора и краткого feedback LED2.

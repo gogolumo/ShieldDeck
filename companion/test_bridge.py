@@ -1,5 +1,7 @@
 import unittest
+from unittest.mock import patch, Mock
 from bridge_protocol import ConnectionLost, LineReader, Session
+from bridge import KeyRunner
 
 
 class Runner:
@@ -7,10 +9,12 @@ class Runner:
         self.busy = False
         self.started = 0
         self.result = None
+        self.buttons = []
 
-    def start(self):
+    def start(self, button):
         self.started += 1
         self.busy = True
+        self.buttons.append(button)
 
     def poll(self):
         result = self.result
@@ -48,13 +52,22 @@ class BridgeTests(unittest.TestCase):
         self.session.tick(0.4)
         self.assertTrue(self.sent[-1].endswith("|ERR|2"))
 
-    def test_wrong_session_revision_and_unassigned(self):
+    def test_wrong_session_revision(self):
         self.button(sid="00000000")
         self.button(rev=2)
         self.assertTrue(self.sent[-1].endswith("|ERR|6"))
-        self.button(button=2)
         self.assertEqual(self.runner.started, 0)
-        self.assertTrue(self.sent[-1].endswith("|ERR|3"))
+
+    def test_three_button_mappings(self):
+        for button in (1, 2, 3):
+            self.button(seq=button, button=button)
+            self.runner.result = 0
+            self.session.tick(0.4)
+        self.assertEqual(self.runner.buttons, [1, 2, 3])
+
+    def test_out_of_range_button_is_ignored(self):
+        self.button(button=4)
+        self.assertEqual(self.runner.started, 0)
 
     def test_busy_and_heartbeat_during_action(self):
         self.button(); self.button(seq=2)
@@ -93,6 +106,41 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(reader.feed(b"BAD\0INPUT\n", 0.3), [])
         reader.feed(b"BT", 0.4)
         self.assertEqual(reader.feed(b"N|old\nNEW\n", 1), ["NEW"])
+
+
+class RunnerTests(unittest.TestCase):
+    @patch("bridge.subprocess.Popen")
+    def test_commands_and_success_semantics(self, popen):
+        runner = KeyRunner("/example/ShieldDeckKeys")
+        for button, command, output in (
+            (1, ["/example/ShieldDeckKeys", "--cmd-tab"], "SENT_CMD_TAB\n"),
+            (2, ["/usr/bin/open", "-b", "com.apple.calculator"], ""),
+            (3, ["/example/ShieldDeckKeys", "--screenshot"], "SENT_SCREENSHOT_SHORTCUT\n"),
+        ):
+            process = Mock()
+            process.poll.return_value = 0
+            process.returncode = 0
+            process.communicate.return_value = (output, "")
+            popen.return_value = process
+            runner.start(button)
+            self.assertEqual(popen.call_args.args[0], command)
+            self.assertEqual(runner.poll(), 0)
+            self.assertFalse(runner.busy)
+
+    @patch("bridge.subprocess.Popen")
+    def test_open_failure_is_not_permission_success(self, popen):
+        process = Mock()
+        process.poll.return_value = process.returncode = 2
+        process.communicate.return_value = ("", "launch failed")
+        popen.return_value = process
+        runner = KeyRunner("/example/keys")
+        runner.start(2)
+        self.assertEqual(runner.poll(), 5)
+
+    def test_disabled_does_not_report_success(self):
+        runner = KeyRunner("unused", disabled=True)
+        runner.start(3)
+        self.assertEqual(runner.poll(), 3)
 
 
 if __name__ == "__main__":
