@@ -78,11 +78,12 @@ class BridgeTests(unittest.TestCase):
 
     def test_timeout_not_retried_and_not_later_success(self):
         self.button()
-        self.session.tick(2.4)
+        self.session.receive(f"PONG|{self.sid}", 3.0)
+        self.session.tick(5.4)
         self.assertTrue(self.sent[-1].endswith("|ERR|1"))
         self.assertTrue(self.runner.busy)
         self.runner.result = 0
-        self.session.tick(2.5)
+        self.session.tick(5.5)
         self.assertFalse(any("|OK|0" in s for s in self.sent))
         self.button()
         self.assertEqual(self.runner.started, 1)
@@ -113,9 +114,9 @@ class RunnerTests(unittest.TestCase):
     def test_commands_and_success_semantics(self, popen):
         runner = KeyRunner("/example/ShieldDeckKeys")
         for button, command, output in (
-            (1, ["/example/ShieldDeckKeys", "--cmd-tab"], "SENT_CMD_TAB\n"),
-            (2, ["/usr/bin/open", "-b", "com.apple.calculator"], ""),
-            (3, ["/example/ShieldDeckKeys", "--screenshot"], "SENT_SCREENSHOT_SHORTCUT\n"),
+            (1, ["/example/ShieldDeckKeys", "--discord-mic"], "SENT_DISCORD_MIC_SHORTCUT\n"),
+            (2, ["/example/ShieldDeckKeys", "--discord-deafen"], "SENT_DISCORD_DEAFEN_SHORTCUT\n"),
+            (3, ["/example/ShieldDeckKeys", "--discord-camera"], "DISCORD_CAMERA_CONTROL_PRESSED\n"),
         ):
             process = Mock()
             process.poll.return_value = 0
@@ -128,13 +129,23 @@ class RunnerTests(unittest.TestCase):
             self.assertFalse(runner.busy)
 
     @patch("bridge.subprocess.Popen")
-    def test_open_failure_is_not_permission_success(self, popen):
+    def test_unavailable_discord_camera_is_not_success(self, popen):
         process = Mock()
-        process.poll.return_value = process.returncode = 2
-        process.communicate.return_value = ("", "launch failed")
+        process.poll.return_value = process.returncode = 3
+        process.communicate.return_value = ("", "DISCORD_CAMERA_UNAVAILABLE")
         popen.return_value = process
         runner = KeyRunner("/example/keys")
-        runner.start(2)
+        runner.start(3)
+        self.assertEqual(runner.poll(), 3)
+
+    @patch("bridge.subprocess.Popen")
+    def test_unexpected_stdout_is_not_success(self, popen):
+        process = Mock()
+        process.poll.return_value = process.returncode = 0
+        process.communicate.return_value = ("wrong action", "")
+        popen.return_value = process
+        runner = KeyRunner("/example/keys")
+        runner.start(1)
         self.assertEqual(runner.poll(), 5)
 
     def test_disabled_does_not_report_success(self):

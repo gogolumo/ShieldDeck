@@ -103,7 +103,7 @@ Core Audio предоставляет [kAudioDevicePropertyMute](https://develop
 
 Документированное [isInUseByAnotherApplication](https://developer.apple.com/documentation/avfoundation/avcapturedevice/isinusebyanotherapplication?language=objc) сообщает об использовании capture device. Оно не даёт состояния «моё видео отправляется в текущий meeting» и не является переключателем чужой camera session.
 
-**Решение проекта:** глобальный Camera Toggle не входит в v1. Позже возможен adapter для конкретного app с проверенным API/state. Пока пользователь может назначить его keyboard shortcut, но получает только momentary feedback. Не выключаем системные службы, не меняем TCC через shell и не выдаём последнее нажатие за privacy guarantee.
+**Решение проекта:** глобальный Camera Toggle не входит в v1. Текущий CLI prototype имеет отдельный Discord action: через Accessibility нажимает подписанный элемент камеры в открытом звонке и возвращает ошибку, если элемент недоступен. Это действие не является StateProvider: остаётся momentary feedback и необходима визуальная проверка в Discord. Позже возможен adapter для конкретного app с проверенным API/state. Не выключаем системные службы, не меняем TCC через shell и не выдаём последнее нажатие за privacy guarantee.
 
 ## 8. MVP actions
 

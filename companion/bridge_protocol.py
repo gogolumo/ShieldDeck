@@ -92,7 +92,7 @@ class Session:
             self.last_pong = now
         elif f == ["CONFIGURED", self.sid, "1"] and self.state == "config":
             self.state = "active"
-            self.log("CONNECTED: P001; S1 = Cmd+Tab; S2 = Calculator; S3 = Screenshot selection")
+            self.log("CONNECTED: P001; S1 = Discord mic; S2 = Discord deafen; S3 = Discord camera")
         elif f[0] == "BTN" and len(f) == 6 and self.state == "active":
             rev, seq, button = number(f[2], 1, 65535), number(f[3], 1, 65535), number(f[4], 1, 3)
             if None in (rev, seq, button) or f[5] != "SHORT":
@@ -141,7 +141,7 @@ class Session:
             if not timed_out:
                 self.result(rev, seq, result)
             self.pending = None
-        elif self.pending and now - self.pending[2] >= 2 and not self.pending[3]:
+        elif self.pending and now - self.pending[2] >= 5 and not self.pending[3]:
             rev, seq, start, _ = self.pending
             self.result(rev, seq, 1)
             self.pending = (rev, seq, start, True)
