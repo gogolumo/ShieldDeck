@@ -1,19 +1,17 @@
 #include <Arduino.h>
 #include "ButtonManager.h"
+#include "LedManager.h"
 
 namespace {
 ButtonManager buttons;
+LedManager leds;
+bool startupTestPending = true;
 uint32_t presses[ButtonManager::count] = {};
 uint32_t lastHeartbeat = 0;
 uint8_t pendingEvents = 0;
 
 void quietOutputs() {
-  // VMA209 schematic: LEDs sink current; the buzzer uses a PNP transistor.
-  // HIGH is inactive. Physical polarity verification is still pending.
-  for (uint8_t pin = 10; pin <= 13; ++pin) {
-    digitalWrite(pin, HIGH);
-    pinMode(pin, OUTPUT);
-  }
+  // VMA209 schematic: the buzzer uses a PNP transistor; HIGH is inactive.
   digitalWrite(3, HIGH);
   pinMode(3, OUTPUT);
   // Blank both 74HC595 outputs; no display scan is active in this test.
@@ -42,9 +40,10 @@ void reportHeartbeat(uint32_t now) {
 
 void setup() {
   quietOutputs();
+  leds.begin();
   buttons.begin();
   Serial.begin(115200);
-  Serial.println(F("DIAG|SHIELDDECK|BUTTONS|1"));
+  Serial.println(F("DIAG|SHIELDDECK|BUTTONS_LEDS|2"));
   for (uint8_t i = 0; i < ButtonManager::count; ++i) {
     Serial.print(F("DIAG|INPUT|"));
     Serial.print(i + 1);
@@ -55,7 +54,16 @@ void setup() {
 
 void loop() {
   const uint32_t now = millis();
+  if (startupTestPending && now >= 1500) {
+    startupTestPending = false;
+    leds.startTest(now);
+  }
+  leds.update(now);
   const uint8_t events = buttons.poll(now);
+  if ((events & 1U) != 0) {
+    startupTestPending = false;
+    leds.startTest(now);  // Diagnostic-only S1 replay, not a macro mapping.
+  }
   pendingEvents |= events;
   for (uint8_t i = 0; i < ButtonManager::count; ++i) {
     if ((events & (1U << i)) != 0) ++presses[i];
