@@ -19,7 +19,7 @@
 | Полярность LEDs на реальной плате | Подтверждена пользователем: D10–D13 active-low, поочерёдное свечение и все OFF в конце |
 | Display 1234, порядок digits, flicker | Пользователь подтвердил `1234` слева направо без заметного мерцания/лишних сегментов |
 | Buzzer короткий beep | Пользователь подтвердил звук; Serial подтверждает возврат D3 в HIGH через 40 ms |
-| End-to-end Cmd+Tab | Ещё не реализован и не проверен |
+| End-to-end Cmd+Tab | Реализован, transport проверен; пользовательский физический тест ещё ожидается |
 
 Первый реальный Serial фрагмент (14:35 UTC):
 
@@ -147,3 +147,29 @@ Build/upload в 16:37 UTC — PASS: Flash 4288 / 32256 bytes, static RAM 258 / 2
 Рабочая firmware protocol v1 теперь находится в `src/main.cpp`/AppController. Hardware smoke сохранён как `src/smoke_main.cpp`, environment `smoke`; для его повторной загрузки старые команды `pio run -e uno` из разделов выше нужно заменить на `-e smoke`.
 
 Host integration test `test/firmware_host.cpp` компилирует настоящие managers/controller с fake Arduino IO: PASS для handshake, release-only events, CONFIG BUSY, session/sequence matching, duplicate/late RESULT, timeout, malformed/oversize frames, reconnect и momentary LEDs. Это software проверка, не замена физического end-to-end теста.
+
+## Protocol v1 загружен, Mac bridge подключён — 17:58 UTC
+
+- Firmware `env:uno`: build/upload PASS, Flash 9112 / 32256 bytes, static RAM 746 / 2048 bytes; 9112 bytes проверены avrdude.
+- `env:smoke` также собирается; предыдущие hardware diagnostics доступны отдельно.
+- `tools/check_hardware_protocol.py`: PASS на физической плате — handshake, повтор CONFIG, fragmented CRLF, неправильные/слишком длинные строки, прекращение heartbeat и новая session без reboot.
+- Test harness учитывает bootloader reset: после открытия ждёт 2 s и очищает старый USB input перед проверкой HELLO. Первоначальные прогоны показали startup BUSY и stale pre-reset HELLO; это исправлено в harness. Реальный bridge обрабатывает каждый новый HELLO и повторяет CONFIG при BUSY.
+- 8 Python protocol tests PASS; native helper скомпилирован. Начальный preflight возвратил ACCESSIBILITY_REQUIRED; после системного запроса текущий preflight возвращает ACCESSIBILITY_OK. Key events при проверке разрешения не отправлялись.
+- Live bridge log `/tmp/shielddeck-bridge-2026-10-01.log`: HELLO → WELCOME → READY → PING/PONG → CONFIG → startup BUSY → CONFIG retry → CONFIGURED → CONNECTED. Последующий heartbeat продолжается.
+- Active session на момент проверки `082E642A`, slot 1, sound off, все LED modes PULSE. S1 назначена на Cmd+Tab, S2/S3 возвращают ERR 3.
+
+Bridge оставлен работающим, Serial Monitor/capture остановлен. Логи остаются вне Git. S1 выполняет action на отпускании; long/profile механика на этой стадии не добавлена. Смена foreground app, отсутствие двойного запуска и реальный LED/display feedback ещё требуют одного контролируемого физического теста пользователем. Milestone пока **не помечен выполненным**.
+
+Команды software проверки:
+
+```sh
+clang++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -Itest/fakes -Iinclude test/firmware_host.cpp src/AppController.cpp src/ButtonManager.cpp src/BuzzerManager.cpp src/DisplayManager.cpp src/LedManager.cpp src/SerialManager.cpp -o /tmp/shielddeck-firmware-test
+/tmp/shielddeck-firmware-test
+~/.platformio/penv/bin/python -m unittest discover -s companion -p 'test_*.py' -v
+```
+
+Реальный transport test выполняется только при остановленном bridge (он открывает/reset-ит порт, выполняет handshake и проверяет отключение heartbeat):
+
+```sh
+~/.platformio/penv/bin/python tools/check_hardware_protocol.py /dev/cu.usbmodem11101
+```
