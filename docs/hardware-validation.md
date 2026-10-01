@@ -232,3 +232,17 @@ Bridge перезапущен с новыми назначениями; log: `/t
 По запросу пользователя назначения заменены: S1 → микрофон Discord, S2 → Deafen Discord, S3 → камера текущего звонка Discord. Для S1/S2 применяются документированные Discord сочетания ⌘⇧M и ⌘⇧D. S3 ищет подписанный camera control в Accessibility tree Discord и нажимает его только при точном совпадении. Firmware и Serial protocol не менялись, прошивка не требуется.
 
 Swift helper собран, `--check` вернул `ACCESSIBILITY_OK`; 14 host tests PASS. Desktop Discord установлен и запущен. Без открытого звонка `--discord-camera-check` вернул `DISCORD_CAMERA_UNAVAILABLE`/exit 3; это ожидаемая безопасная ошибка, камера не включалась. Физические проверки S1/S2/S3 и наблюдение фактических состояний Discord ещё не проведены. Постоянная индикация состояния на LEDs не включена: моментальный feedback показывает только успешную отправку shortcut/нажатие элемента, а не состояние mic/deafen/camera.
+
+## Нажатия Discord-схемы в журнале bridge
+
+В 19:53–19:55 UTC после запуска новой схемы bridge записал 64 `BTN|...|SHORT` с уникальными последовательными seq 1–64: S1 — 15, S2 — 26, S3 — 23. Для S1 есть 15 `SENT_DISCORD_MIC_SHORTCUT`, для S2 — 26 `SENT_DISCORD_DEAFEN_SHORTCUT`, для S3 — 22 `DISCORD_CAMERA_CONTROL_PRESSED`. Единственная ошибка: S3 с seq 6 вернула `DISCORD_CAMERA_UNAVAILABLE` и `RESULT|...|ERR|3`. Остальные 63 события получили `RESULT|...|OK|0`.
+
+Пример доступного camera control в той же session:
+
+```text
+19:54:56.178 RX BTN|733B615E|1|62|3|SHORT
+19:54:56.353 DISCORD_CAMERA_CONTROL_PRESSED: verify video state in Discord
+19:54:56.354 TX RESULT|733B615E|1|62|OK|0
+```
+
+Это подтверждает путь от нажатия кнопки до отправки сочетания или Accessibility press и ответ устройства. Журнал не содержит наблюдения интерфейса Discord, поэтому фактические mute, Deafen и передача видео остаются неподтверждёнными пользователем. Также нельзя по этой серии доказать отношение «одно физическое нажатие → ровно одно событие»: число реальных нажатий независимо не записывалось.

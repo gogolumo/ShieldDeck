@@ -1,31 +1,45 @@
 # ShieldDeck
 
-Программируемый macro pad для Mac на Arduino Uno + Velleman VMA209.
-Три кнопки запускают назначенные в macOS действия, четыре LEDs и display дают обратную связь.
-Переназначение команд и profiles не требует перепрошивки Arduino.
+Macro pad для Mac на Arduino Uno и Velleman VMA209. Плата передаёт нажатия по USB Serial, а запущенный на Mac bridge выполняет команды и возвращает результат для LED и дисплея. Текущие назначения жёстко заданы в bridge; интерфейс переназначения и profiles ещё не реализованы.
 
-**Статус: hardware и прежние три действия подтверждены пользователем; новая Discord-схема ожидает физической проверки.**
-Hardware smoke пройден: три кнопки, active-low LEDs, display `1234` и короткий buzzer. Текущие назначения: S1 — mute/unmute микрофона Discord, S2 — Deafen/Undeafen Discord, S3 — камера в открытом звонке Discord. Для камеры нужен доступный элемент управления в интерфейсе звонка; иначе будет `E003`. [Сборка и запуск bridge](companion/README.md), [фактические результаты](docs/hardware-validation.md).
+| Кнопка | Текущее действие |
+| --- | --- |
+| S1 | Переключить микрофон Discord (mute/unmute) |
+| S2 | Переключить Deafen в Discord (звук Discord и микрофон) |
+| S3 | Нажать кнопку включения/выключения камеры в открытом звонке Discord |
 
-При соединении display показывает `P001`, LED4 горит. S1 запускает команду при отпускании; LED1 даёт краткий feedback и гаснет. Без Mac — `----` и мигание LED4. `E001` = timeout, `E002` = permission denied, `E003` = действие не назначено/недоступно, `E004` = busy, `E005` = execution failed, `E006` = config mismatch. OK означает отправку клавиш; видимое переключение подтверждает пользователь.
+Нужен установленный и запущенный **Discord для macOS**. S1 и S2 отправляют сочетания ⌘⇧M и ⌘⇧D; S3 ищет подписанную кнопку камеры через Accessibility. Если Discord не запущен или кнопка камеры недоступна, устройство показывает `E003`. S3 управляет только видео Discord в звонке, а не доступом к камере во всей macOS. Если Discord показывает предпросмотр видео, включение камеры может потребовать подтверждения в приложении.
 
-## Документация
+**Статус проверки:** hardware, Serial и прежние демонстрационные действия подтверждены пользователем. Для текущей Discord-схемы журнал bridge за 19:53–19:55 UTC содержит 64 события от кнопок, 63 успешных результата отправки команды/нажатия элемента и один `E003` для недоступной камеры. Подтверждения пользователем фактического mute, Deafen и передачи видео пока нет; `OK` не означает, что состояние Discord проверено. Подробнее — в [журнале проверок](docs/hardware-validation.md).
 
-- [Архитектура и UX](docs/architecture.md): решения по всем 15 пунктам задания, ограничения macOS, hardware и state synchronization.
-- [Serial protocol v1 — draft](docs/protocol.md): сообщения, reconnect, ошибки и защита от повторного выполнения.
-- [Roadmap и Definition of Done](docs/roadmap.md): этапы, критерии проверки и первое учебное задание.
+## Запуск на текущем Mac
 
-## Структура
+1. Подключить Arduino с загруженной `env:uno` firmware, закрыть Serial Monitor и запустить Discord.
+2. Из корня репозитория собрать helper и проверить Accessibility:
+
+   ```sh
+   mkdir -p companion/.build
+   xcrun swiftc -O companion/KeySender.swift -o companion/.build/ShieldDeckKeys
+   companion/.build/ShieldDeckKeys --check
+   ```
+
+3. Запустить bridge (путь USB-порта может отличаться):
+
+   ```sh
+   ~/.platformio/penv/bin/python companion/bridge.py --port /dev/cu.usbmodem11101
+   ```
+
+Если `--check` сообщает об отказе, включить Accessibility для запускающего приложения в macOS System Settings → Privacy & Security → Accessibility. Подробности сборки, проверки и ограничений — в [инструкции companion](companion/README.md). Для первой прошивки или повторной загрузки firmware: `~/.platformio/penv/bin/pio run -e uno -t upload`; на время upload bridge нужно остановить клавишами Ctrl+C.
+
+При соединении дисплей показывает `P001`, LED4 горит. Команда запускается при отпускании кнопки; LED1–3 дают короткий отклик и гаснут. Они **не показывают текущее состояние** микрофона, звука или камеры. Без bridge дисплей показывает `----`, LED4 мигает. Ошибки: `E001` timeout, `E002` нет разрешения, `E003` действие недоступно, `E004` занято, `E005` ошибка исполнения, `E006` несовпадение конфигурации.
+
+## Проект и документация
 
 | Путь | Назначение |
 | --- | --- |
-| `platformio.ini` | Существующая конфигурация `atmelavr / uno / arduino` |
-| `src/`, `include/`, `test/` | Firmware, drivers, host tests; `env:uno` — protocol v1, `env:smoke` — hardware diagnostics |
-| `docs/` | Проектирование и учебный план |
-| `companion/` | Python Serial bridge, native Swift keyboard helper и protocol tests |
-| `tools/` | Serial capture и автоматическая проверка protocol на реальной плате |
+| `platformio.ini`, `src/`, `include/`, `test/` | Firmware: `env:uno` — рабочий Serial protocol; `env:smoke` — hardware diagnostics |
+| `companion/` | Python bridge, Swift helper и host tests |
+| `tools/` | Serial capture и проверка protocol на плате |
+| `docs/` | [Архитектура](docs/architecture.md), [протокол](docs/protocol.md), [план](docs/roadmap.md), [журнал проверок](docs/hardware-validation.md) |
 
-Текущий порядок по обновлённому заданию: небольшой firmware шаг → build → upload → Serial → физический тест → следующий шаг. Код и прошивку выполняет агент; пользователь помогает там, где нужно нажать кнопку, увидеть LED/display или услышать beep. Объяснения на русском, названия API и programming terms — на английском.
-
-Следующий этап — физическая проверка Discord-схемы, затем конфигурируемые назначения и profiles. Полноценный menu bar app пока не реализован. Для остановки текущего CLI bridge — Ctrl+C в его терминале; Arduino затем покажет `----`.
-Сгенерированные файлы, локальные настройки с командами и секреты не входят в Git.
+Следующий шаг — подтвердить глазами переключение всех трёх функций в Discord, затем добавить настраиваемые назначения и profiles. Личные настройки, секреты, кэш и файлы сборки не входят в Git.
