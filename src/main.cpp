@@ -1,18 +1,69 @@
 #include <Arduino.h>
+#include "ButtonManager.h"
 
-// put function declarations here:
-int myFunction(int, int);
+namespace {
+ButtonManager buttons;
+uint32_t presses[ButtonManager::count] = {};
+uint32_t lastHeartbeat = 0;
+uint8_t pendingEvents = 0;
+
+void quietOutputs() {
+  // VMA209 schematic: LEDs sink current; the buzzer uses a PNP transistor.
+  // HIGH is inactive. Physical polarity verification is still pending.
+  for (uint8_t pin = 10; pin <= 13; ++pin) {
+    digitalWrite(pin, HIGH);
+    pinMode(pin, OUTPUT);
+  }
+  digitalWrite(3, HIGH);
+  pinMode(3, OUTPUT);
+  // Blank both 74HC595 outputs; no display scan is active in this test.
+  pinMode(4, OUTPUT);
+  pinMode(7, OUTPUT);
+  pinMode(8, OUTPUT);
+  digitalWrite(4, LOW);
+  shiftOut(8, 7, MSBFIRST, 0xFF);  // Segments inactive.
+  shiftOut(8, 7, MSBFIRST, 0x00);  // No digit selected.
+  digitalWrite(4, HIGH);
+}
+
+void reportHeartbeat(uint32_t now) {
+  // Skip rather than block when the Serial TX buffer is busy.
+  if (uint32_t(now - lastHeartbeat) < 2000 || Serial.availableForWrite() < 58) return;
+  lastHeartbeat = now;
+  Serial.print(F("DIAG|ALIVE|"));
+  Serial.print(now);
+  for (uint8_t i = 0; i < ButtonManager::count; ++i) {
+    Serial.print('|');
+    Serial.print(presses[i]);
+  }
+  Serial.println();
+}
+}  // namespace
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+  quietOutputs();
+  buttons.begin();
+  Serial.begin(115200);
+  Serial.println(F("DIAG|SHIELDDECK|BUTTONS|1"));
+  for (uint8_t i = 0; i < ButtonManager::count; ++i) {
+    Serial.print(F("DIAG|INPUT|"));
+    Serial.print(i + 1);
+    Serial.print('|');
+    Serial.println(digitalRead(A1 + i) == LOW ? F("LOW") : F("HIGH"));
+  }
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+  const uint32_t now = millis();
+  const uint8_t events = buttons.poll(now);
+  pendingEvents |= events;
+  for (uint8_t i = 0; i < ButtonManager::count; ++i) {
+    if ((events & (1U << i)) != 0) ++presses[i];
+    if ((pendingEvents & (1U << i)) == 0 || Serial.availableForWrite() < 13) continue;
+    Serial.print(F("BTN|"));
+    Serial.print(i + 1);
+    Serial.println(F("|PRESS"));
+    pendingEvents &= uint8_t(~(1U << i));
+  }
+  reportHeartbeat(now);
 }
