@@ -43,6 +43,17 @@ void DisplayManager::writeFrame(uint8_t segments, uint8_t digitMask) {
   digitalWrite(latchPin, HIGH);
 }
 
+void DisplayManager::showStatus(char prefix, uint16_t number) {
+  setDigits(0, (number / 100) % 10, (number / 10) % 10, number % 10);
+  if (prefix == 'P') segments_[0] = 0x8C;
+  else if (prefix == 'b') segments_[0] = 0x83;
+  else if (prefix == 'E') segments_[0] = 0x86;
+}
+
+void DisplayManager::showOffline() {
+  for (uint8_t i = 0; i < 4; ++i) segments_[i] = 0xBF;  // g segment only.
+}
+
 void DisplayManager::update(uint32_t nowUs) {
   const uint32_t gap = uint32_t(nowUs - lastScanUs_);
   if (gap < scanIntervalUs) return;

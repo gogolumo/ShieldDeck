@@ -1,6 +1,12 @@
 # ShieldDeck Serial protocol v1 — draft
 
-Статус: проект контракта; обе реализации ещё отсутствуют. Wire format — ASCII, separator `|`, terminator LF; CR перед LF допустим и удаляется. 115200 baud, 8N1. Длина строки до 95 bytes без terminator, buffer 96 bytes с завершающим NUL. Переполнение: отбросить всю строку до LF, не исполнять её префикс. Неоконченная строка удаляется после 500 ms без новых bytes.
+Статус: контракт v1; firmware реализует подмножество первой вертикали, перечисленное ниже. Wire format — ASCII, separator `|`, terminator LF; CR перед LF допустим и удаляется. 115200 baud, 8N1. Длина строки до 95 bytes без terminator, buffer 96 bytes с завершающим NUL. Переполнение: отбросить всю строку до LF, не исполнять её префикс. Неоконченная строка после 500 ms без новых bytes отбрасывается вместе с остатком до LF — её хвост не должен стать новой командой.
+
+## Реализованное подмножество первой вертикали
+
+`env:uno`: HELLO/WELCOME/READY, CONFIG/CONFIGURED/REJECT, PING/PONG, BTN SHORT на отпускании, ACK/RESULT, timeouts и session IDs. Только slot P001 и PULSE; sound 0/1. Другие profiles, OBSERVED/STATE и LONG пока не реализованы. Unsupported CONFIG не применяется; timeout SYNCING приводит к reconnect. Несовместимый WELCOME возвращает VERSION и оставляет offline индикацию (отдельный fast-blink VERSION_ERROR пока не реализован). Основной контракт ниже остаётся целевым; наличие зарезервированной команды не означает поддержку её текущей сборкой.
+
+`env:smoke` сохраняет прежние DIAG/BTN PRESS hardware tests. Это явно отдельная диагностическая сборка, а не второй production protocol. Buzzer выключен в начальной CONFIG, S1/S2/S3 отправляют generic events; Mac на первом этапе назначает только S1.
 
 Точные число полей, направления, enum values и диапазоны проверяются до изменения состояния. Пустые поля, NUL, прочие control characters и неизвестные команды не исполняются. Ошибки parser логируются с rate limit на Mac; на плате не вызывают звуковой/Serial storm. CRC в v1 не добавляем; это локальный USB transport, не аутентифицированная сеть.
 

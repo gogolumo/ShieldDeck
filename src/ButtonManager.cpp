@@ -11,10 +11,20 @@ void ButtonManager::begin() {
 
 uint8_t ButtonManager::poll(uint32_t now) {
   uint8_t presses = 0;
+  releases_ = 0;
   for (uint8_t i = 0; i < count; ++i) {
+    const bool wasPressed = buttons_[i].isPressed();
     if (buttons_[i].update(digitalRead(pins_[i]) == LOW, now)) {
       presses |= uint8_t(1U << i);
     }
+    if (wasPressed && !buttons_[i].isPressed()) releases_ |= uint8_t(1U << i);
   }
   return presses;
+}
+
+bool ButtonManager::allReleased() const {
+  for (uint8_t i = 0; i < count; ++i) {
+    if (!buttons_[i].isReleased()) return false;
+  }
+  return true;
 }

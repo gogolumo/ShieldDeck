@@ -6,6 +6,8 @@
 class DebouncedButton {
  public:
   static constexpr uint32_t debounceMs = 25;
+  bool isPressed() const { return stablePressed_; }
+  bool isReleased() const { return !rawPressed_ && !stablePressed_ && armed_; }
 
   void begin(bool pressed, uint32_t now) {
     rawPressed_ = stablePressed_ = pressed;

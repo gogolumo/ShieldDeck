@@ -15,6 +15,10 @@ void LedManager::startTest(uint32_t now) {
   applyStep();
 }
 
+void LedManager::set(uint8_t number, bool on) {
+  if (number >= 1 && number <= 4) digitalWrite(9 + number, on ? LOW : HIGH);
+}
+
 void LedManager::update(uint32_t now) {
   if (step_ >= 8) return;
   const uint32_t duration = (step_ % 2 == 0) ? 700 : 300;

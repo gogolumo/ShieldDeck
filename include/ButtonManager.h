@@ -9,8 +9,11 @@ class ButtonManager {
   void begin();
   // Bit 0 = A1, bit 1 = A2, bit 2 = A3; one event per stable press.
   uint8_t poll(uint32_t now);
+  uint8_t releases() const { return releases_; }
+  bool allReleased() const;
 
  private:
   static const uint8_t pins_[count];
   DebouncedButton buttons_[count];
+  uint8_t releases_ = 0;
 };

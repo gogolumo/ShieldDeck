@@ -18,7 +18,7 @@
 | Физическое S3 / A3 нажатие | Один контролируемый тест пройден: ровно один PRESS, изменился только третий счётчик |
 | Полярность LEDs на реальной плате | Подтверждена пользователем: D10–D13 active-low, поочерёдное свечение и все OFF в конце |
 | Display 1234, порядок digits, flicker | Пользователь подтвердил `1234` слева направо без заметного мерцания/лишних сегментов |
-| Buzzer короткий beep | Ещё не проверен |
+| Buzzer короткий beep | Пользователь подтвердил звук; Serial подтверждает возврат D3 в HIGH через 40 ms |
 | End-to-end Cmd+Tab | Ещё не реализован и не проверен |
 
 Первый реальный Serial фрагмент (14:35 UTC):
@@ -139,3 +139,11 @@ Build/upload PASS: Flash 4074 / 32256 bytes, static RAM 253 / 2048 bytes; avrdud
 Build/upload в 16:37 UTC — PASS: Flash 4288 / 32256 bytes, static RAM 258 / 2048 bytes; avrdude подтвердил запись 4288 bytes. После открытия capture пришёл `DIAG|SHIELDDECK|BUZZER|4`, heartbeat и полный LED sequence. В первые 6 s max scan gap составил 2332 us; buzzer автоматически не запускался. Проверка его физического звука пока ожидается.
 
 Следующий тест: одно нажатие S2. В Serial ожидаются `BTN|2|PRESS`, `DIAG|BUZZER|LOW` и `DIAG|BUZZER|HIGH|40` (допустима небольшая погрешность loop). Пользователь должен услышать короткий сигнал с последующей тишиной либо сообщить «щелчок»/«тишина»/другое поведение. Не помечаем buzzer исправным по одной компиляции или software log.
+
+## Buzzer подтверждён; первая вертикаль в разработке
+
+Пользователь ответил «есть» на вопрос о коротком писке с последующей тишиной. Serial в 17:35 UTC содержит несколько S2 событий; каждый сопутствующий `DIAG|BUZZER|LOW` завершён `DIAG|BUZZER|HIGH|40`. Число физических нажатий этой серии не устанавливалось, поэтому по ней не делаем вывод о debounce. Короткий DC pulse достаточен для слышимого feedback на данном экземпляре.
+
+Рабочая firmware protocol v1 теперь находится в `src/main.cpp`/AppController. Hardware smoke сохранён как `src/smoke_main.cpp`, environment `smoke`; для его повторной загрузки старые команды `pio run -e uno` из разделов выше нужно заменить на `-e smoke`.
+
+Host integration test `test/firmware_host.cpp` компилирует настоящие managers/controller с fake Arduino IO: PASS для handshake, release-only events, CONFIG BUSY, session/sequence matching, duplicate/late RESULT, timeout, malformed/oversize frames, reconnect и momentary LEDs. Это software проверка, не замена физического end-to-end теста.

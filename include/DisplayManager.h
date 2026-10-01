@@ -7,6 +7,8 @@ class DisplayManager {
   void begin();
   // Each argument is a decimal digit; values >9 blank that position.
   void setDigits(uint8_t first, uint8_t second, uint8_t third, uint8_t fourth);
+  void showStatus(char prefix, uint16_t number);
+  void showOffline();
   void update(uint32_t nowUs);
   uint32_t maxScanGapUs() const { return maxScanGapUs_; }
 

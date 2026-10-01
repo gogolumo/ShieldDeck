@@ -6,6 +6,7 @@
 class LedManager {
  public:
   void begin();
+  void set(uint8_t number, bool on);
   void startTest(uint32_t now);
   void update(uint32_t now);
 
