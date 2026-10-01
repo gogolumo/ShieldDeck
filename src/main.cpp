@@ -2,22 +2,18 @@
 #include "ButtonManager.h"
 #include "LedManager.h"
 #include "DisplayManager.h"
+#include "BuzzerManager.h"
 
 namespace {
 ButtonManager buttons;
 LedManager leds;
 DisplayManager display;
+BuzzerManager buzzer;
 bool startupTestPending = true;
 uint32_t presses[ButtonManager::count] = {};
 uint32_t lastHeartbeat = 0;
 uint8_t pendingEvents = 0;
 bool scanReportPending = false;
-
-void quietOutputs() {
-  // VMA209 schematic: the buzzer uses a PNP transistor; HIGH is inactive.
-  digitalWrite(3, HIGH);
-  pinMode(3, OUTPUT);
-}
 
 void reportHeartbeat(uint32_t now) {
   if (scanReportPending && Serial.availableForWrite() >= 32) {
@@ -41,11 +37,11 @@ void reportHeartbeat(uint32_t now) {
 }  // namespace
 
 void setup() {
-  quietOutputs();
+  buzzer.begin();
   leds.begin();
   buttons.begin();
   Serial.begin(115200);
-  Serial.println(F("DIAG|SHIELDDECK|DISPLAY|3"));
+  Serial.println(F("DIAG|SHIELDDECK|BUZZER|4"));
   for (uint8_t i = 0; i < ButtonManager::count; ++i) {
     Serial.print(F("DIAG|INPUT|"));
     Serial.print(i + 1);
@@ -60,6 +56,7 @@ void setup() {
 void loop() {
   display.update(micros());
   const uint32_t now = millis();
+  buzzer.update(now);
   if (startupTestPending && now >= 1500) {
     startupTestPending = false;
     leds.startTest(now);
@@ -70,6 +67,7 @@ void loop() {
     startupTestPending = false;
     leds.startTest(now);  // Diagnostic-only S1 replay, not a macro mapping.
   }
+  if ((events & 2U) != 0) buzzer.startTest(now);  // Diagnostic-only S2 beep.
   pendingEvents |= events;
   for (uint8_t i = 0; i < ButtonManager::count; ++i) {
     if ((events & (1U << i)) != 0) ++presses[i];
